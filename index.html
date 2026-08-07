@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Relatório de Execução de Serviço</title>
+  <!-- Google Fonts: Inter e Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- Remix Icons para ícones modernos -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <!-- html2pdf.js para exportação direta para PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- BARRA DE FERRAMENTAS SUPERIOR (HEADER APLICAÇÃO) -->
+  <header class="app-header no-print">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <i class="ri-file-paper-2-line"></i>
+      </div>
+      <div>
+        <h1>Relatório Pro <span class="badge-v1">v2.0</span></h1>
+        <p class="subtitle">Gerador de Relatórios com Banco Google Sheets & Cloud Drive</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- BADGE STATUS DE CONEXÃO COM NUVEM GOOGLE -->
+      <div class="cloud-sync-badge disconnected" id="cloud-sync-badge" title="Clique no botão de engrenagem para configurar a integração com Google Sheets e Drive">
+        <i class="ri-cloud-off-line"></i> Nuvem Desconectada (Modo Local)
+      </div>
+
+      <button type="button" class="btn-icon" id="btn-cloud-config" title="Configurar Integração com Google Sheets & Drive">
+        <i class="ri-settings-4-line"></i>
+      </button>
+
+      <!-- PERFIL DO USUÁRIO LOGADO -->
+      <div class="user-profile-badge" id="user-profile-badge" style="display: none;">
+        <div class="user-avatar"><i class="ri-user-3-fill"></i></div>
+        <div class="user-info">
+          <span class="user-name" id="user-name-display">Usuário</span>
+          <span class="user-role" id="user-role-display">Técnico</span>
+        </div>
+        <button type="button" class="btn-xs btn-outline" id="btn-logout" title="Sair da conta">
+          <i class="ri-logout-box-r-line"></i> Sair
+        </button>
+      </div>
+
+      <!-- BOTÃO NOVO RELATÓRIO -->
+      <button type="button" class="btn btn-primary-action" id="btn-new-report" title="Iniciar a criação de um novo relatório">
+        <i class="ri-add-circle-line"></i> Novo Relatório
+      </button>
+
+      <button type="button" class="btn btn-outline" id="btn-clear" title="Limpar formulário">
+        <i class="ri-delete-bin-line"></i> Limpar
+      </button>
+
+      <div class="dropdown-wrapper">
+        <button type="button" class="btn btn-secondary" id="btn-json-menu">
+          <i class="ri-database-2-line"></i> Dados <i class="ri-arrow-down-s-line"></i>
+        </button>
+        <div class="dropdown-menu" id="json-dropdown">
+          <button type="button" id="btn-export-json"><i class="ri-download-2-line"></i> Salvar Rascunho (.json)</button>
+          <label for="input-import-json" class="dropdown-item-label">
+            <i class="ri-upload-2-line"></i> Carregar Rascunho (.json)
+            <input type="file" id="input-import-json" accept=".json" style="display: none;">
+          </label>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-accent" id="btn-print-pdf">
+        <i class="ri-file-pdf-fill"></i> Gerar / Baixar PDF
+      </button>
+
+      <button type="button" class="btn-icon" id="btn-theme-toggle" title="Alternar Tema Claro/Escuro">
+        <i class="ri-moon-line" id="theme-icon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- SELETOR DE MODO (EDITOR / PRÉ-VISUALIZAÇÃO) PARA DISPOSITIVOS MENORES -->
+  <div class="mode-selector no-print">
+    <button class="mode-tab active" data-tab="editor">
+      <i class="ri-edit-box-line"></i> Editor
+    </button>
+    <button class="mode-tab" data-tab="preview">
+      <i class="ri-eye-line"></i> Pré-Visualização (A4)
+    </button>
+  </div>
+
+  <!-- CONTAINER PRINCIPAL DIVIDIDO EM DUAS COLUNAS -->
+  <main class="app-layout">
+
+    <!-- SEÇÃO 1: FORMULÁRIO DO EDITOR -->
+    <section class="editor-pane no-print" id="pane-editor">
+      
+      <!-- 1. DADOS DA EMPRESA EMISSORA (FIXO E EDITÁVEL) -->
+      <details class="accordion-item" open>
+        <summary class="accordion-header">
+          <i class="ri-building-line"></i>
+          <span>1. Dados da Sua Empresa (Perfil Fixo / Editável)</span>
+          <span class="badge-fixed-info" title="Estes dados ficam salvos fixos no seu navegador para todos os novos relatórios"><i class="ri-pushpin-fill"></i> Dados Salvos</span>
+          <i class="ri-chevron-down-line accordion-arrow"></i>
+        </summary>
+        <div class="accordion-content">
+          <div class="fixed-company-banner">
+            <i class="ri-information-line"></i>
+            <span>Os dados da sua empresa ficam <strong>fixos e salvos automaticamente</strong>. Você pode editá-los a qualquer momento e eles permanecerão pré-preenchidos para novos relatórios.</span>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group span-full">
+              <label>Logotipo da Empresa</label>
+              <div class="logo-upload-container">
+                <div class="logo-preview-box" id="logo-preview-box">
+                  <i class="ri-image-add-line"></i>
+                  <span>Clique para enviar logo</span>
+                </div>
+                <input type="file" id="input-company-logo" accept="image/*" class="file-input-hidden">
+                <div class="logo-actions">
+                  <button type="button" class="btn btn-xs btn-outline" id="btn-trigger-logo">Selecionar Imagem</button>
+                  <button type="button" class="btn btn-xs btn-danger-outline" id="btn-remove-logo" style="display: none;">Remover</button>
+                  <span class="help-text">Recomendado: PNG ou JPG com fundo transparente.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group span-2">
+              <label for="company-name">Nome / Razão Social da Empresa</label>
+              <input type="text" id="company-name" placeholder="Ex: TechServ Engenharia & Manutenção Ltda.">
+            </div>
+
+            <div class="form-group">
+              <label for="company-cnpj">CNPJ / CPF</label>
+              <input type="text" id="company-cnpj" placeholder="00.000.000/0001-00">
+            </div>
+
+            <div class="form-group span-2">
+              <label for="company-contact">Telefone / E-mail de Contato</label>
+              <input type="text" id="company-contact" placeholder="(11) 99999-9999 | contato@techserv.com.br">
+            </div>
+
+            <div class="form-group">
+              <label for="company-address">Endereço da Empresa</label>
+              <input type="text" id="company-address" placeholder="Av. Paulista, 1000 - São Paulo/SP">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 2. DADOS DO CLIENTE E IDENTIFICAÇÃO DO SERVIÇO (COM CADASTRO DE CLIENTES SALVOS) -->
+      <details class="accordion-item" open>
+        <summary class="accordion-header">
+          <i class="ri-user-star-line"></i>
+          <span>2. Dados do Cliente e da Ordem de Serviço</span>
+          <i class="ri-chevron-down-line accordion-arrow"></i>
+        </summary>
+        <div class="accordion-content">
+          
+          <!-- BANNER DE CLIENTES SALVOS -->
+          <div class="client-manager-bar">
+            <div class="client-manager-select-wrapper">
+              <i class="ri-user-search-line"></i>
+              <select id="select-saved-client">
+                <option value="">-- Carregar Cliente Salvo do Cadastro --</option>
+              </select>
+            </div>
+            <div class="client-manager-buttons">
+              <button type="button" class="btn btn-xs btn-outline" id="btn-save-client" title="Salvar dados deste cliente para usar em outros relatórios">
+                <i class="ri-user-add-line"></i> Salvar Cliente no Cadastro
+              </button>
+              <button type="button" class="btn btn-xs btn-danger-outline" id="btn-delete-client" style="display: none;" title="Excluir este cliente do cadastro">
+                <i class="ri-delete-bin-line"></i> Excluir do Cadastro
+              </button>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group span-2">
+              <label for="client-name">Nome do Cliente / Empresa Contratante *</label>
+              <input type="text" id="client-name" placeholder="Ex: Condomínio Edifício Solar das Acácias">
+            </div>
+
+            <div class="form-group">
+              <label for="os-number">Nº da Ordem de Serviço (OS) *</label>
+              <input type="text" id="os-number" placeholder="Ex: OS-2026/0842">
+            </div>
+
+            <div class="form-group">
+              <label for="client-document">CPF / CNPJ do Cliente</label>
+              <input type="text" id="client-document" placeholder="Ex: 12.345.678/0001-90">
+            </div>
+
+            <div class="form-group">
+              <label for="client-contact">Pessoa de Contato / Resp. no Local</label>
+              <input type="text" id="client-contact" placeholder="Ex: Sr. Ricardo (Síndico)">
+            </div>
+
+            <div class="form-group span-2">
+              <label for="service-location">Endereço do Local de Execução</label>
+              <input type="text" id="service-location" placeholder="Ex: Rua das Flores, 123 - Bloco B - Centro">
+            </div>
+
+            <div class="form-group">
+              <label for="technician-name">Técnico / Inspetor Responsável *</label>
+              <input type="text" id="technician-name" placeholder="Ex: Eng. Carlos Eduardo Ramos">
+            </div>
+
+            <div class="form-group">
+              <label for="service-date-start">Data e Hora de Início</label>
+              <input type="datetime-local" id="service-date-start">
+            </div>
+
+            <div class="form-group">
+              <label for="service-date-end">Data e Hora de Término</label>
+              <input type="datetime-local" id="service-date-end">
+            </div>
+
+            <div class="form-group">
+              <label for="service-status">Status de Execução</label>
+              <select id="service-status">
+                <option value="Concluído">✅ Concluído com Sucesso</option>
+                <option value="Concluído com Pendências">⚠️ Concluído com Pendências</option>
+                <option value="Em Andamento">🔄 Em Andamento</option>
+                <option value="Aprovado em Inspeção">🔍 Aprovado em Inspeção</option>
+                <option value="Reprovado / Requer Intervenção">❌ Reprovado / Requer Intervenção</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 3. DETALHAMENTO TÉCNICO DO SERVIÇO -->
+      <details class="accordion-item" open>
+        <summary class="accordion-header">
+          <i class="ri-tools-line"></i>
+          <span>3. Detalhamento e Parecer Técnico</span>
+          <i class="ri-chevron-down-line accordion-arrow"></i>
+        </summary>
+        <div class="accordion-content">
+          <div class="form-grid">
+            <div class="form-group span-full">
+              <label for="service-title">Título do Serviço Executado *</label>
+              <input type="text" id="service-title" placeholder="Ex: Manutenção Preventiva e Corretiva no Sistema de Refrigeração Central">
+            </div>
+
+            <div class="form-group span-full">
+              <label for="service-description">Descrição Detalhada das Atividades Realizadas</label>
+              <textarea id="service-description" rows="5" placeholder="- Efetuada limpeza de filtros e serpentinas&#10;- Substituição de rolamentos desgastados no motor principal&#10;- Teste de pressão e recarga de fluido refrigerante R-410A&#10;- Verificação do painel de comando e aperto de bornes elétricos"></textarea>
+            </div>
+
+            <div class="form-group span-full">
+              <label for="materials-used">Materiais, Peças e Equipamentos Utilizados</label>
+              <textarea id="materials-used" rows="3" placeholder="Ex: 01x Rolamento SKF 6204; 2.5kg Fluido R-410A; 01x Filtro Secador 3/8; Produtos de higienização bactericida."></textarea>
+            </div>
+
+            <div class="form-group span-full">
+              <label for="observations-conclusions">Observações, Recomendações e Parecer Final</label>
+              <textarea id="observations-conclusions" rows="4" placeholder="O sistema operou dentro das especificações do fabricante após os ajustes. Recomenda-se nova inspeção em 90 dias ou substituição preventiva das correias secundárias."></textarea>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 4. ANEXO FOTOGRÁFICO -->
+      <details class="accordion-item" open>
+        <summary class="accordion-header">
+          <i class="ri-camera-lens-line"></i>
+          <span>4. Anexo Fotográfico (<span id="photo-count-badge">0</span> fotos)</span>
+          <i class="ri-chevron-down-line accordion-arrow"></i>
+        </summary>
+        <div class="accordion-content">
+          
+          <!-- DROPAREA DE FOTOS -->
+          <div class="drop-zone" id="photo-drop-zone">
+            <div class="drop-zone-icon">
+              <i class="ri-upload-cloud-2-line"></i>
+            </div>
+            <div class="drop-zone-text">
+              <strong>Arraste e solte as fotografias do serviço aqui</strong>
+              <span>ou clique para navegar no seu computador/celular</span>
+            </div>
+            <input type="file" id="input-photos" accept="image/*" multiple class="file-input-hidden">
+            <button type="button" class="btn btn-sm btn-outline" id="btn-trigger-photos">
+              <i class="ri-folder-open-line"></i> Selecionar Fotos
+            </button>
+          </div>
+
+          <div class="photos-toolbar">
+            <span>Fotos adicionadas: <strong id="photo-counter">0</strong></span>
+            <button type="button" class="btn btn-xs btn-danger-outline" id="btn-clear-photos" style="display: none;">
+              <i class="ri-delete-bin-3-line"></i> Remover Todas as Fotos
+            </button>
+          </div>
+
+          <!-- LISTA DE CARDS DAS FOTOS NO EDITOR -->
+          <div class="photo-cards-list" id="photo-cards-container">
+            <div class="empty-state" id="photos-empty-state">
+              <i class="ri-image-line"></i>
+              <p>Nenhuma foto adicionada ainda ao relatório.</p>
+              <small>Adicione fotos do "Antes", "Durante" e "Depois" da execução do serviço.</small>
+            </div>
+          </div>
+
+        </div>
+      </details>
+
+      <!-- 5. ANEXO DOCUMENTAL -->
+      <details class="accordion-item" open>
+        <summary class="accordion-header">
+          <i class="ri-folder-zip-line"></i>
+          <span>5. Anexo Documental (PDF ou Imagem) (<span id="doc-count-badge">0</span> anexos)</span>
+          <i class="ri-chevron-down-line accordion-arrow"></i>
+        </summary>
+        <div class="accordion-content">
+          
+          <div class="drop-zone" id="doc-drop-zone">
+            <div class="drop-zone-icon">
+              <i class="ri-file-add-line"></i>
+            </div>
+            <div class="drop-zone-text">
+              <strong>Arraste e solte Documentos (PDF ou Imagens) aqui</strong>
+              <span>Certificados, ART/RRT, Manuais Técnicos, Comprovantes ou Notas Fiscais</span>
+            </div>
+            <input type="file" id="input-doc-attachments" accept=".pdf,image/*" multiple class="file-input-hidden">
+            <button type="button" class="btn btn-sm btn-outline" id="btn-trigger-docs">
+              <i class="ri-attachment-line"></i> Selecionar PDF ou Imagens
+            </button>
+          </div>
+
+          <div class="photos-toolbar">
+            <span>Documentos anexados: <strong id="doc-counter">0</strong></span>
+            <button type="button" class="btn btn-xs btn-danger-outline" id="btn-clear-docs" style="display: none;">
+              <i class="ri-delete-bin-3-line"></i> Remover Todos os Anexos
+            </button>
+          </div>
+
+          <!-- LISTA DE CARDS DE DOCUMENTOS NO EDITOR -->
+          <div class="photo-cards-list" id="doc-cards-container">
+            <div class="empty-state" id="docs-empty-state">
+              <i class="ri-file-text-line"></i>
+              <p>Nenhum documento anexado ainda.</p>
+              <small>Você pode anexar arquivos PDF (ex: ART, laudos, especificações) ou fotos de documentos/certificados.</small>
+            </div>
+          </div>
+
+        </div>
+      </details>
+
+    </section>
+
+    <!-- SEÇÃO 2: PRÉ-VISUALIZAÇÃO EM FORMATO DE FOLHA A4 (IMPRESSÃO / PDF) -->
+    <section class="preview-pane" id="pane-preview">
+      
+      <div class="preview-toolbar no-print">
+        <span><i class="ri-pages-line"></i> Visualização do Documento A4</span>
+        <button type="button" class="btn btn-sm btn-accent" id="btn-print-preview">
+          <i class="ri-printer-line"></i> Imprimir / PDF
+        </button>
+      </div>
+
+      <!-- FOLHA IMPRESSA A4 (CONTEÚDO RENDERIZADO) -->
+      <div class="a4-container" id="report-paper">
+        
+        <!-- CABEÇALHO DO DOCUMENTO A4 -->
+        <header class="doc-header">
+          <div class="doc-brand">
+            <div class="doc-logo" id="doc-logo-container">
+              <div class="logo-placeholder" id="doc-logo-placeholder">
+                <i class="ri-building-2-line"></i>
+                <span>SUA LOGO AQUI</span>
+              </div>
+              <img id="doc-logo-img" src="" alt="Logo da Empresa" style="display: none;">
+            </div>
+            <div class="doc-company-info">
+              <h2 id="doc-company-name">Nome da Sua Empresa Ltda.</h2>
+              <p id="doc-company-cnpj">CNPJ: 00.000.000/0001-00</p>
+              <p id="doc-company-address">Endereço da Empresa - Cidade / UF</p>
+              <p id="doc-company-contact">Tel / E-mail de Contato</p>
+            </div>
+          </div>
+
+          <div class="doc-meta">
+            <div class="doc-badge-title">RELATÓRIO DE EXECUÇÃO DE SERVIÇO</div>
+            <div class="doc-meta-box">
+              <div class="doc-meta-row">
+                <span class="meta-label">Nº OS:</span>
+                <span class="meta-value highlight" id="doc-os-number">OS-2026/0000</span>
+              </div>
+              <div class="doc-meta-row">
+                <span class="meta-label">Data Emissão:</span>
+                <span class="meta-value" id="doc-issue-date">06/08/2026</span>
+              </div>
+              <div class="doc-meta-row">
+                <span class="meta-label">Status:</span>
+                <span class="status-badge" id="doc-status-badge">Concluído</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- SEÇÃO 1 DO RELATÓRIO: IDENTIFICAÇÃO -->
+        <section class="doc-section">
+          <h3 class="doc-section-title"><i class="ri-information-line"></i> 1. Identificação do Cliente e Local</h3>
+          <div class="doc-grid-2">
+            <div class="doc-field">
+              <span class="field-label">Cliente / Contratante:</span>
+              <span class="field-value" id="doc-client-name">-</span>
+            </div>
+            <div class="doc-field">
+              <span class="field-label">CPF / CNPJ:</span>
+              <span class="field-value" id="doc-client-document">-</span>
+            </div>
+            <div class="doc-field">
+              <span class="field-label">Responsável no Local:</span>
+              <span class="field-value" id="doc-client-contact">-</span>
+            </div>
+            <div class="doc-field">
+              <span class="field-label">Técnico / Resp. Execução:</span>
+              <span class="field-value" id="doc-technician-name">-</span>
+            </div>
+            <div class="doc-field span-2">
+              <span class="field-label">Endereço de Execução:</span>
+              <span class="field-value" id="doc-service-location">-</span>
+            </div>
+            <div class="doc-field">
+              <span class="field-label">Início dos Serviços:</span>
+              <span class="field-value" id="doc-date-start">-</span>
+            </div>
+            <div class="doc-field">
+              <span class="field-label">Término dos Serviços:</span>
+              <span class="field-value" id="doc-date-end">-</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- SEÇÃO 2 DO RELATÓRIO: DETALHAMENTO DOS SERVIÇOS -->
+        <section class="doc-section">
+          <h3 class="doc-section-title"><i class="ri-file-list-3-line"></i> 2. Descrição dos Serviços Executados</h3>
+          
+          <div class="doc-box">
+            <h4 class="doc-sub-title" id="doc-service-title">Título do Serviço</h4>
+            <div class="doc-text-content" id="doc-service-description">
+              Nenhuma descrição informada.
+            </div>
+          </div>
+
+          <div class="doc-box" id="doc-box-materials">
+            <h4 class="doc-sub-title">Materiais, Peças e Equipamentos Utilizados</h4>
+            <div class="doc-text-content" id="doc-materials-used">
+              Nenhum material listado.
+            </div>
+          </div>
+
+          <div class="doc-box" id="doc-box-observations">
+            <h4 class="doc-sub-title">Observações e Parecer Técnico Final</h4>
+            <div class="doc-text-content" id="doc-observations">
+              Sem observações adicionais.
+            </div>
+          </div>
+        </section>
+
+        <!-- QUEBRA DE PÁGINA ANTES DO ANEXO FOTOGRÁFICO -->
+        <div class="page-break"></div>
+
+        <!-- SEÇÃO 3 DO RELATÓRIO: ANEXO FOTOGRÁFICO -->
+        <section class="doc-section" id="doc-section-photos">
+          <h3 class="doc-section-title"><i class="ri-camera-3-line"></i> 3. Anexo Fotográfico da Execução</h3>
+          
+          <div class="doc-photo-grid" id="doc-photo-grid">
+            <div class="empty-doc-photos">
+              Nenhuma imagem anexada ao relatório.
+            </div>
+          </div>
+        </section>
+
+        <!-- QUEBRA DE PÁGINA ANTES DO ANEXO DOCUMENTAL (SE HOUVER DOCUMENTOS) -->
+        <div class="page-break" id="page-break-docs" style="display: none;"></div>
+
+        <!-- SEÇÃO 4 DO RELATÓRIO: ANEXO DOCUMENTAL (PDF / IMAGENS DE DOCUMENTOS) -->
+        <section class="doc-section" id="doc-section-attachments" style="display: none;">
+          <h3 class="doc-section-title"><i class="ri-attachment-2"></i> 4. Anexo Documental e Certificações</h3>
+          
+          <table class="doc-table-attachments" id="doc-attachments-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tipo / Categoria</th>
+                <th>Nome do Documento</th>
+                <th>Observações / Referência</th>
+              </tr>
+            </thead>
+            <tbody id="doc-attachments-tbody">
+              <!-- Renderizado dinamicamente -->
+            </tbody>
+          </table>
+
+          <div class="doc-attachments-previews" id="doc-attachments-previews">
+            <!-- Imagens de documentos anexados são renderizadas aqui -->
+          </div>
+        </section>
+
+        <!-- RODAPÉ DA FOLHA IMPRESSA -->
+        <footer class="doc-footer">
+          <div class="footer-divider"></div>
+          <div class="footer-content">
+            <span id="doc-footer-company">Relatório de Execução de Serviço</span>
+            <span>Página de Registro Técnico</span>
+          </div>
+        </footer>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- TELA DE OVERLAY DE LOGIN / CADASTRO DE USUÁRIO -->
+  <div class="login-overlay active no-print" id="login-screen-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-brand-icon"><i class="ri-shield-keyhole-line"></i></div>
+        <h2>Acesso ao Relatório Pro</h2>
+        <p>Acesse sua conta para criar e gerenciar relatórios com integração Google Sheets & Drive.</p>
+      </div>
+
+      <!-- SELETOR DE ABAS DA TELA DE LOGIN -->
+      <div class="login-tabs">
+        <button type="button" class="login-tab-btn active" id="tab-login-btn">
+          <i class="ri-login-box-line"></i> Entrar
+        </button>
+        <button type="button" class="login-tab-btn" id="tab-register-btn">
+          <i class="ri-user-add-line"></i> Cadastrar Usuário
+        </button>
+      </div>
+
+      <!-- ABA 1: FORMULÁRIO DE LOGIN -->
+      <div class="login-box-body" id="box-login-form">
+        <div class="auth-alert error" id="login-error-alert" style="display: none;"></div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="login-email">E-mail / Login de Acesso</label>
+          <input type="email" id="login-email" placeholder="tecnico@empresa.com" value="tecnico@empresa.com">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="login-password">Senha de Acesso</label>
+          <input type="password" id="login-password" placeholder="Sua senha" value="123">
+        </div>
+
+        <button type="button" class="btn btn-accent btn-full" id="btn-login-submit">
+          <i class="ri-login-box-line"></i> Entrar no Sistema
+        </button>
+
+        <div class="login-demo-hint">
+          <span>💡 <strong>Contas demonstrativas para teste:</strong><br>
+          • <strong>Administrador:</strong> <code>admin@empresa.com</code> (Senha: <code>123</code>)<br>
+          • <strong>Técnico Executor:</strong> <code>tecnico@empresa.com</code> (Senha: <code>123</code>)</span>
+        </div>
+      </div>
+
+      <!-- ABA 2: FORMULÁRIO DE CADASTRO DE NOVO USUÁRIO (GRAVADO NO GOOGLE SHEETS) -->
+      <div class="login-box-body" id="box-register-form" style="display: none;">
+        <div class="auth-alert success" id="register-success-alert" style="display: none;"></div>
+        <div class="auth-alert error" id="register-error-alert" style="display: none;"></div>
+
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="reg-name">Nome Completo do Usuário / Técnico</label>
+          <input type="text" id="reg-name" placeholder="Ex: Eng. Carlos Eduardo Silva">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="reg-email">E-mail Corporativo (Login)</label>
+          <input type="email" id="reg-email" placeholder="carlos@empresa.com">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="reg-password">Senha de Acesso</label>
+          <input type="password" id="reg-password" placeholder="Crie uma senha segura">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="reg-role">Cargo / Função no Sistema</label>
+          <select id="reg-role">
+            <option value="Técnico Executor">🛠️ Técnico Executor</option>
+            <option value="Inspetor Técnico">🔍 Inspetor / Perito</option>
+            <option value="Gerente de Operações">👔 Gerente de Operações</option>
+            <option value="Administrador">🔑 Administrador</option>
+          </select>
+        </div>
+
+        <button type="button" class="btn btn-primary-action btn-full" id="btn-register-submit">
+          <i class="ri-user-add-line"></i> Criar Meu Cadastro no Google Sheets
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURAÇÃO DA INTEGRAÇÃO GOOGLE (SHEETS & DRIVE) -->
+  <div class="modal-overlay no-print" id="modal-cloud-settings">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-icon" style="background-color: rgba(37, 99, 235, 0.15); color: var(--accent-primary);">
+          <i class="ri-google-line"></i>
+        </div>
+        <div>
+          <h3 class="modal-title">Integração Google Sheets & Drive</h3>
+          <p class="modal-subtitle">Conecte sua planilha do Google para salvamento e cadastro em nuvem.</p>
+        </div>
+      </div>
+
+      <div class="modal-body" style="background: none; border: none; padding: 0;">
+        <div class="fixed-company-banner" style="margin-bottom: 12px;">
+          <i class="ri-information-line"></i>
+          <span>Insira a URL do Web App do seu <strong>Google Apps Script</strong> para integrar o banco de dados (Google Sheets) e armazenamento de PDFs no Google Drive.</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="cloud-webapp-url">URL do Web App do Google Apps Script</label>
+          <input type="text" id="cloud-webapp-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="cloud-spreadsheet-id">ID da Planilha Google Sheets (Opcional)</label>
+          <input type="text" id="cloud-spreadsheet-id" placeholder="Ex: 1BxiMVs0XRrf5nFM... (da URL da planilha)">
+        </div>
+
+        <div class="form-group">
+          <label for="cloud-drive-folder-id">ID da Pasta no Google Drive (Opcional)</label>
+          <input type="text" id="cloud-drive-folder-id" placeholder="Ex: 1a2b3c4d5e... (da URL da pasta)">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btn-close-cloud-modal">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-accent" id="btn-save-cloud-config">
+          <i class="ri-save-line"></i> Salvar Configuração
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMAÇÃO PARA NOVO RELATÓRIO -->
+  <div class="modal-overlay no-print" id="modal-new-report">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon">
+          <i class="ri-question-line"></i>
+        </div>
+        <div>
+          <h3 class="modal-title">Iniciar Novo Relatório</h3>
+          <p class="modal-subtitle">Você já possui dados preenchidos no relatório atual.</p>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <p>Deseja salvar o relatório atual em um arquivo de rascunho (<strong>.json</strong>) antes de iniciar um novo relatório em branco?</p>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btn-modal-cancel">
+          Cancelar
+        </button>
+
+        <button type="button" class="btn btn-danger-outline" id="btn-modal-discard">
+          <i class="ri-delete-bin-line"></i> Iniciar Novo sem Salvar
+        </button>
+
+        <button type="button" class="btn btn-primary-action" id="btn-modal-save-new">
+          <i class="ri-save-3-line"></i> Salvar Rascunho e Criar Novo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/googleSheets.js"></script>
+  <script src="js/googleDrive.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/pdf.js"></script>
+</body>
+</html>
